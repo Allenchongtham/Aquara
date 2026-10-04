@@ -1,242 +1,122 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import Dashboard from './tabs/Dashboard';
+import AquaraMap from './tabs/AquaraMap';
+import Report from './tabs/Report';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('report');
-  
-  const [issueType, setIssueType] = useState('NO_WATER');
-  const [description, setDescription] = useState('');
-  const [latitude, setLatitude] = useState(24.8170);
-  const [longitude, setLongitude] = useState(93.9368);
-  const [loading, setLoading] = useState(false);
-  const [successData, setSuccessData] = useState(null);
-  const [error, setError] = useState('');
-
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [reports, setReports] = useState([]);
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude);
-          setLongitude(position.coords.longitude);
-        },
-        () => console.warn("Using default coordinates.")
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'map') {
-      fetchReports();
-    }
-  }, [activeTab]);
 
   const fetchReports = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/reports');
-      if (res.data && res.data.data) {
-        setReports(res.data.data);
-      }
+      const response = await axios.get('http://localhost:8000/api/reports');
+      setReports(response.data);
     } catch (err) {
-      console.error("Failed to fetch reports for map", err);
+      console.error('Failed to fetch reports:', err);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'map') {
-      const timer = setTimeout(() => {
-        if (mapRef.current) {
-          if (!mapInstanceRef.current) {
-            mapInstanceRef.current = L.map(mapRef.current).setView([latitude, longitude], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(mapInstanceRef.current);
-          } else {
-            mapInstanceRef.current.setView([latitude, longitude], 12);
-            mapInstanceRef.current.invalidateSize();
-          }
+    fetchReports();
+  }, []);
 
-          mapInstanceRef.current.eachLayer((layer) => {
-            if (layer instanceof L.Marker) {
-              mapInstanceRef.current.removeLayer(layer);
-            }
-          });
-
-          reports.forEach((r) => {
-            if (r.latitude && r.longitude) {
-              const marker = L.marker([r.latitude, r.longitude]).addTo(mapInstanceRef.current);
-              marker.bindPopup(`
-                <div style="font-size: 12px; font-family: sans-serif;">
-                  <strong>${r.ai_analysis?.issue_type || "Report"}</strong><br/>
-                  ${r.original_text}<br/>
-                  <span style="color: red; font-weight: bold;">Severity: ${r.ai_analysis?.severity}</span>
-                </div>
-              `);
-            }
-          });
-        }
-      }, 150);
-
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab, reports, latitude, longitude]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!description.trim()) {
-      setError('Please provide a description.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await axios.post('http://localhost:8000/api/reports', {
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        description: `[Issue Type: ${issueType}] ${description}`
-      });
-      setSuccessData(response.data);
-      setDescription('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to connect to backend at http://localhost:8000');
-    } finally {
-      setLoading(false);
-    }
+  const handleReportSuccess = () => {
+    fetchReports();
+    setActiveTab('dashboard');
   };
 
-  const issueOptions = [
-    { id: 'NO_WATER', label: 'No irrigation water' },
-    { id: 'DRY_CANAL', label: 'Canal dry' },
-    { id: 'DAMAGED_INFRASTRUCTURE', label: 'Damaged infrastructure' },
-    { id: 'OTHER', label: 'Other issue' },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <header className="bg-slate-900 text-white px-8 py-4 flex justify-between items-center shadow-md z-50">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-xl tracking-wide text-teal-400">Aquara</span>
-          <span className="text-xs bg-slate-800 px-3 py-1 rounded text-slate-300 border border-slate-700">Desktop Web Platform</span>
+    <div className="flex flex-col h-screen w-full bg-slate-100 font-sans overflow-hidden">
+      {/* Desktop Header */}
+      <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm h-16 flex-shrink-0">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="w-9 h-9 rounded-xl bg-[#20403B] flex items-center justify-center text-white font-bold">
+            A
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-slate-800 leading-tight">Aquara</h1>
+            <p className="text-xs text-slate-500">Water Observability Platform</p>
+          </div>
         </div>
-        <nav className="flex gap-4">
-          <button 
-            onClick={() => setActiveTab('report')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'report' ? 'bg-teal-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+
+        <nav className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'dashboard' ? 'bg-[#20403B] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
-            Submit Report
+            Dashboard
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('map')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'map' ? 'bg-teal-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'map' ? 'bg-[#20403B] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
-            Live Map View
+            Irrigation Map
+          </button>
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'report' ? 'bg-[#20403B] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Report Issue
           </button>
         </nav>
       </header>
 
-      <main className="flex-1 flex flex-col relative w-full p-6">
-        {activeTab === 'report' ? (
-          <div className="max-w-xl mx-auto my-12 w-full p-6 bg-white rounded-2xl shadow-xl border border-slate-200">
-            <h2 className="text-xl font-bold text-slate-800 mb-1">Submit Ground-Truth Report</h2>
-            <p className="text-xs text-slate-500 mb-6">Reports are automatically analyzed by Gemini AI and stored in MongoDB.</p>
-
-            {successData ? (
-              <div className="p-8 text-center space-y-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-                  OK
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">Report Successfully Processed</h3>
-                <div className="bg-white p-4 rounded-lg text-left text-xs space-y-1 border border-slate-200 font-mono">
-                  <p><strong>Database ID:</strong> {successData.id}</p>
-                  <p><strong>Classified Issue:</strong> {successData.ai_analysis.issue_type}</p>
-                  <p><strong>Severity:</strong> <span className="text-red-600 font-bold">{successData.ai_analysis.severity}</span></p>
-                </div>
-                <button 
-                  onClick={() => setSuccessData(null)}
-                  className="w-full py-2.5 bg-teal-800 hover:bg-teal-900 text-white rounded-lg font-medium transition shadow"
-                >
-                  Submit Another Report
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium">{error}</div>}
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Select Issue Category
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {issueOptions.map((opt) => (
-                      <div
-                        key={opt.id}
-                        onClick={() => setIssueType(opt.id)}
-                        className={`p-3 rounded-xl border cursor-pointer text-sm transition flex items-center justify-between ${
-                          issueType === opt.id 
-                            ? 'border-teal-700 bg-teal-50 text-slate-900 font-semibold' 
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <span>{opt.label}</span>
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          issueType === opt.id ? 'border-teal-700 bg-teal-700' : 'border-slate-300'
-                        }`}>
-                          {issueType === opt.id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Description & Observations
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter detailed notes from the field..."
-                    className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-700 text-sm text-slate-700 resize-none bg-slate-50"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
-                  <span>GPS Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}</span>
-                  <span className="text-emerald-700 font-semibold bg-emerald-100 px-2 py-0.5 rounded">GPS Active</span>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 text-white rounded-xl font-medium shadow-lg transition"
-                >
-                  {loading ? 'Analyzing with Gemini AI...' : 'Submit Report'}
-                </button>
-              </form>
-            )}
-          </div>
-        ) : (
-          <div className="w-full max-w-7xl mx-auto flex flex-col flex-1">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-slate-800">Live Observation Map</h2>
-              <p className="text-xs text-slate-500">Real-time ground-truth reports from the community.</p>
-            </div>
-            {/* Explicit fixed height on container guarantees map tiles load */}
-            <div className="w-full bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden" style={{ height: '650px' }}>
-              <div ref={mapRef} style={{ height: '100%', width: '100%' }} />
-            </div>
-          </div>
+      {/* Main Content Area */}
+      <main className="flex-1 w-full overflow-y-auto pb-16 md:pb-0 relative">
+        {activeTab === 'dashboard' && (
+          <Dashboard reports={reports} onNavigateToReport={() => setActiveTab('report')} />
+        )}
+        {activeTab === 'map' && <AquaraMap reports={reports} />}
+        {activeTab === 'report' && (
+          <Report onClose={() => setActiveTab('dashboard')} onSuccess={handleReportSuccess} />
         )}
       </main>
+
+      {/* Fixed Uniform Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 grid grid-cols-3 z-50 shadow-lg">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`flex flex-col items-center justify-center h-full transition-colors ${
+            activeTab === 'dashboard' ? 'text-[#20403B] font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
+          </svg>
+          <span className="text-[11px] mt-0.5">Home</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('map')}
+          className={`flex flex-col items-center justify-center h-full transition-colors ${
+            activeTab === 'map' ? 'text-[#20403B] font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503-12.485l-4.5 1.95a1.5 1.5 0 01-1.006 0l-4.5-1.95A1.5 1.5 0 002.25 5.25v12.214a1.5 1.5 0 002.003 1.385l4.5-1.95a1.5 1.5 0 011.006 0l4.5 1.95a1.5 1.5 0 002.003-1.385V5.25a1.5 1.5 0 00-1.756-1.485z" />
+          </svg>
+          <span className="text-[11px] mt-0.5">Map</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('report')}
+          className={`flex flex-col items-center justify-center h-full transition-colors ${
+            activeTab === 'report' ? 'text-[#20403B] font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <svg className="w-5 h-5 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-[11px] mt-0.5">Report</span>
+        </button>
+      </nav>
     </div>
   );
 }
